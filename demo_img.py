@@ -1,7 +1,7 @@
 #--*-- coding:utf-8 --*--
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import pycuda.autoinit
 from pycuda.compiler import SourceModule
@@ -45,7 +45,7 @@ class TensorRTEngine(object):
         # PyCUDA ERROR: The context stack was not empty upon module cleanup.
         self.cfx.pop() 
         
-        self.shape_of_output = (batch_size, 1000)
+        self.shape_of_output = (batch_size, 2)
 
     def __del__(self):
         del self.inputs
@@ -135,7 +135,6 @@ class TensorRTEngine(object):
                                             inputs=self.inputs, 
                                             outputs=self.outputs, 
                                             stream=self.stream)
-        
         output = self.postprocess(trt_outputs[0])
         self.cfx.pop()  # 3. 推理后执行cfx.pop()
         return output
@@ -152,8 +151,8 @@ class TensorRTEngine(object):
         self.cfx.pop()  # 3. 推理后执行cfx.pop()
         return output
 
-model = TensorRTEngine('./models/resnet50.onnx')
+model = TensorRTEngine('../models/drop.onnx')
 for i in range(10):
     t1 = time.time()
-    model.inference_file('1.png')
-    print(time.time() - t1)
+    res = model.inference_file('1.png')
+    print(res)
