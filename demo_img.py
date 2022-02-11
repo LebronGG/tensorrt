@@ -1,16 +1,14 @@
 #--*-- coding:utf-8 --*--
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-
-import pycuda.autoinit
-from pycuda.compiler import SourceModule
+# from pycuda.compiler import SourceModule
 import tensorrt as trt
 import pycuda.driver as cuda
 import numpy as np
 import tensorrt as trt
 import time
 import cv2
+
 
 def init():   # 1. 子进程开始初始化cuda driver
     cuda.init()
@@ -151,8 +149,14 @@ class TensorRTEngine(object):
         self.cfx.pop()  # 3. 推理后执行cfx.pop()
         return output
 
-model = TensorRTEngine('../models/drop.onnx')
-for i in range(10):
-    t1 = time.time()
-    res = model.inference_file('1.png')
-    print(res)
+if __name__ == '__main__':
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    import pycuda.autoinit
+    model = TensorRTEngine('../models/drop.onnx')
+    image = cv2.imread('1.png')
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    for i in range(10):
+        t1 = time.time()
+        res = model.inference_image(image)
+        t2 = time.time()
+        print(t2 - t1, res[0])

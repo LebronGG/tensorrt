@@ -11,10 +11,10 @@ import torch
 import time
 from PIL import Image
 import cv2
-import torchvision
+from torchvision import transforms
 
 max_batch_size = 1
-onnx_model_path = "./models/densenet161.onnx"
+onnx_model_path = "../models/drop.onnx"
 
 
 TRT_LOGGER = trt.Logger()  # This logger is required to build an engine
@@ -121,10 +121,6 @@ def postprocess_the_outputs(h_outputs, shape_of_output):
     h_outputs = h_outputs.reshape(*shape_of_output)
     return h_outputs
 
-
-img_np_nchw = np.random.randn(1, 3, 224, 224)
-img_np_nchw = img_np_nchw.astype(dtype=np.float32)
-
 # These two modes are dependent on hardwares
 fp16_mode = False
 int8_mode = False
@@ -137,16 +133,40 @@ context = engine.create_execution_context()
 inputs, outputs, bindings, stream = allocate_buffers(engine) # input, output: host # bindings
 
 # Do inference
-shape_of_output = (max_batch_size, 1000)
+shape_of_output = (max_batch_size, 2)
 # Load data to the buffer
-inputs[0].host = img_np_nchw.reshape(-1)
+
+
+def torch_trans(image):
+    tfms = transforms.Compose([ transforms.ToTensor(), transforms.Resize((224,224)),
+                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+
+    img_np_nchw = tfms(image).unsqueeze(0).cpu().numpy().astype(dtype=np.float32)
+    return img_np_nchw
+
+def np_trans(image):
+    image_cv = cv2.resize(image, (224, 224))
+    miu = np.array([0.485, 0.456, 0.406]).reshape(3, 1, 1)
+    std = np.array([0.229, 0.224, 0.225]).reshape(3, 1, 1)
+    img_np = np.array(image_cv, dtype=np.float)/255.
+    img_np = img_np.transpose((2, 0, 1))
+    img_np -= miu
+    img_np /= std
+    img_np_nchw = img_np[np.newaxis]
+    img_np_nchw = np.tile(img_np_nchw,(1, 1, 1, 1))
+    img_np_nchw = img_np_nchw.astype(dtype=np.float32)
+    return img_np_nchw
+
+# image = Image.open('2.png').convert('RGB')
+image = cv2.cvtColor(cv2.imread('1.png'), cv2.COLOR_BGR2RGB)
+
+inputs[0].host = np_trans(image).reshape(-1)
 
 # inputs[1].host = ... for multiple input
-for i in range(100):
+for i in range(10):
     t1 = time.time()
     trt_outputs = do_inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
     feat = postprocess_the_outputs(trt_outputs[0], shape_of_output)
-    print(time.time() - t1)
+    print(time.time() - t1, feat)
 
-print('All completed!')
 
