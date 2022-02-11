@@ -14,7 +14,7 @@ import cv2
 from torchvision import transforms
 
 max_batch_size = 1
-onnx_model_path = "../models/drop.onnx"
+onnx_model_path = "../models/resnet50.onnx"
 
 
 TRT_LOGGER = trt.Logger()  # This logger is required to build an engine
@@ -163,7 +163,7 @@ def softmax(x):
     return softmax_x 
 
 # image = Image.open('2.png').convert('RGB')
-image = cv2.cvtColor(cv2.imread('1.png'), cv2.COLOR_BGR2RGB)
+image = cv2.cvtColor(cv2.imread('2.png'), cv2.COLOR_BGR2RGB)
 
 inputs[0].host = np_trans(image).reshape(-1)
 
