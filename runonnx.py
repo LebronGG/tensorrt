@@ -13,14 +13,37 @@ input_name = sess.get_inputs()[0].name
 label_name = sess.get_outputs()[0].name
 
 
-tfms = transforms.Compose([ transforms.ToTensor(), transforms.Resize((224,224)),
+def torch_trans(image):
+    tfms = transforms.Compose([ transforms.ToTensor(), transforms.Resize((224,224)),
                             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+
+    img_np_nchw = tfms(image).unsqueeze(0).cpu().numpy().astype(dtype=np.float32)
+    return img_np_nchw
+
+def np_trans(image):
+    image_cv = cv2.resize(image, (224, 224))
+    miu = np.array([0.485, 0.456, 0.406]).reshape(3, 1, 1)
+    std = np.array([0.229, 0.224, 0.225]).reshape(3, 1, 1)
+    img_np = np.array(image_cv, dtype=np.float)/255.
+    img_np = img_np.transpose((2, 0, 1))
+    img_np -= miu
+    img_np /= std
+    img_np_nchw = img_np[np.newaxis]
+    img_np_nchw = np.tile(img_np_nchw,(1, 1, 1, 1))
+    img_np_nchw = img_np_nchw.astype(dtype=np.float32)
+    return img_np_nchw
+
+def softmax(x):
+    exp_x = np.exp(x)
+    softmax_x = exp_x / np.sum(exp_x)
+    return softmax_x 
 
 # image = Image.open('2.png').convert('RGB')
 image = cv2.cvtColor(cv2.imread('1.png'), cv2.COLOR_BGR2RGB)
 
+img = torch_trans(image)
+
 for i in range(10):
     t1 = time.time()
-    pred_onx = sess.run([label_name], {input_name:tfms(image).unsqueeze(0).cpu().numpy()})[0]
-    t2 = time.time()
-    print(t2 - t1, pred_onx)
+    prob = sess.run([label_name], {input_name:img})[0]
+    print(time.time() - t1, softmax(prob))

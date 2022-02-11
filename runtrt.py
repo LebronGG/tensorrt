@@ -157,6 +157,11 @@ def np_trans(image):
     img_np_nchw = img_np_nchw.astype(dtype=np.float32)
     return img_np_nchw
 
+def softmax(x):
+    exp_x = np.exp(x)
+    softmax_x = exp_x / np.sum(exp_x)
+    return softmax_x 
+
 # image = Image.open('2.png').convert('RGB')
 image = cv2.cvtColor(cv2.imread('1.png'), cv2.COLOR_BGR2RGB)
 
@@ -166,7 +171,7 @@ inputs[0].host = np_trans(image).reshape(-1)
 for i in range(10):
     t1 = time.time()
     trt_outputs = do_inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
-    feat = postprocess_the_outputs(trt_outputs[0], shape_of_output)
-    print(time.time() - t1, feat)
+    prob = postprocess_the_outputs(trt_outputs[0], shape_of_output)
+    print(time.time() - t1, softmax(prob))
 
 
