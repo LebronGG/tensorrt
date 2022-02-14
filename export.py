@@ -14,7 +14,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 device = torch.device('cpu')
 
 def drop():
-    model = models.resnet101(pretrained=True)
+    model = models.resnet152(pretrained=True)
     num_ftrs = model.fc.in_features
 
     model.fc = nn.Sequential(
@@ -31,12 +31,18 @@ def drop():
     input_name = ['input']
     output_name = ['output']
 
-    data = torch.rand(1, 3, 224, 224).to(device)
+    data = torch.tensor(np.random.rand(1, 3, 224, 224), dtype=torch.float32).to(device)
     
-    torch.save(model.state_dict(), '../models/resnet101.pth')
-    torch.onnx.export(model, data, '../models/resnet101.onnx', input_names=input_name, output_names=output_name, verbose=False, opset_version=11)
+    torch.save(model.state_dict(), '../models/resnet152.pth')
+    torch.onnx.export(model, data, '../models/resnet152.onnx', 
+                    opset_version=11,
+                    export_params=True,
+                    do_constant_folding=True,
+                    input_names=input_name, 
+                    output_names=output_name, 
+                    verbose=False)
 
-    test = onnx.load('../models/resnet101.onnx')
+    test = onnx.load('../models/resnet152.onnx')
     onnx.checker.check_model(test)
     print("==> Passed")
 

@@ -1,7 +1,7 @@
 #--*-- coding:utf-8 --*--
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import pycuda.autoinit
 import numpy as np
@@ -14,7 +14,7 @@ import cv2
 from torchvision import transforms
 
 max_batch_size = 1
-onnx_model_path = "../models/resnet50.onnx"
+onnx_model_path = "../models/resnet152.onnx"
 
 
 TRT_LOGGER = trt.Logger()  # This logger is required to build an engine
@@ -62,17 +62,15 @@ def get_engine(max_batch_size=1, onnx_file_path="", engine_file_path="", \
     def build_engine(max_batch_size, save_engine):
         """Takes an ONNX file and creates a TensorRT engine to run inference with"""
         EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-        with trt.Builder(TRT_LOGGER) as builder, \
-                builder.create_network(EXPLICIT_BATCH) as network, \
-                trt.OnnxParser(network, TRT_LOGGER) as parser:
-
-            builder.max_workspace_size = 1 << 30  # Your workspace size
+        with trt.Builder(TRT_LOGGER) as builder, builder.create_network(EXPLICIT_BATCH) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
+            # Your workspace size 1 << 30 # 256MiB
+            builder.max_workspace_size = 1 << 30
             builder.max_batch_size = max_batch_size
             # pdb.set_trace()
             builder.fp16_mode = fp16_mode  # Default: False
             builder.int8_mode = int8_mode  # Default: False
             if int8_mode:
-                # To be updated
+                #To be updated
                 raise NotImplementedError
 
             # Parse model file
@@ -105,14 +103,26 @@ def get_engine(max_batch_size=1, onnx_file_path="", engine_file_path="", \
 
 
 def do_inference(context, bindings, inputs, outputs, stream, batch_size=1):
+    t1 = time.time()
+
     # Transfer data from CPU to the GPU.
     [cuda.memcpy_htod_async(inp.device, inp.host, stream) for inp in inputs]
+    t2 = time.time()
+
     # Run inference.
     context.execute_async(batch_size=batch_size, bindings=bindings, stream_handle=stream.handle)
+    t3 = time.time()
+
     # Transfer predictions back from the GPU.
     [cuda.memcpy_dtoh_async(out.host, out.device, stream) for out in outputs]
+    t4 = time.time()
+
     # Synchronize the stream
     stream.synchronize()
+    t5 = time.time()
+
+    print("Transfer:{:.6f} inference:{:6f} back:{:6f} synchronize:{:6f}".format(t2 - t1, t3 - t2, t4 - t3, t5 - t4))
+
     # Return only the host outputs.
     return [out.host for out in outputs]
 
@@ -140,7 +150,6 @@ shape_of_output = (max_batch_size, 2)
 def torch_trans(image):
     tfms = transforms.Compose([ transforms.ToTensor(), transforms.Resize((224,224)),
                             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-
     img_np_nchw = tfms(image).unsqueeze(0).cpu().numpy().astype(dtype=np.float32)
     return img_np_nchw
 

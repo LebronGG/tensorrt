@@ -15,9 +15,9 @@ def softmax(x):
     return softmax_x 
 
 
-device = torch.device('cpu')
+device = torch.device('cuda')
 
-model = models.resnet18(pretrained=True)
+model = models.resnet152(pretrained=True)
 num_ftrs = model.fc.in_features
 
 model.fc = nn.Sequential(
@@ -27,13 +27,13 @@ model.fc = nn.Sequential(
     nn.Linear(1024, 2)
 )
 
-# model.load_state_dict(torch.load('../models/resnet152.pth'))
+model.load_state_dict(torch.load('../models/resnet152.pth'))
 
 model.eval()
 model.to(device)
 
-tfms = transforms.Compose([ transforms.ToTensor(), transforms.Resize((224,224)),
-                                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+tfms = transforms.Compose([transforms.ToTensor(), transforms.Resize((224,224)),
+                            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 
 # image = Image.open('2.png').convert('RGB')
@@ -42,7 +42,7 @@ img = tfms(image).unsqueeze(0).to(device)
 
 
 with torch.no_grad():
-    for i in range(50):
+    for i in range(10):
         t1 = time.time()
         prob = model(img).cpu().numpy()
         print(time.time() - t1, softmax(prob))
