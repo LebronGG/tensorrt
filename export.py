@@ -34,13 +34,16 @@ def drop():
     data = torch.tensor(np.random.rand(1, 3, 224, 224), dtype=torch.float32).to(device)
     
     torch.save(model.state_dict(), '../models/resnet152.pth')
+
     torch.onnx.export(model, data, '../models/resnet152.onnx', 
-                    opset_version=11,
-                    export_params=True,
-                    do_constant_folding=True,
-                    input_names=input_name, 
-                    output_names=output_name, 
-                    verbose=False)
+                    export_params=True,        # store the trained parameter weights inside the model file
+                    do_constant_folding=True,  # whether to execute constant folding for optimization
+                    input_names = ['input'],   # the model's input names
+                    output_names = ['output'], # the model's output names
+                    opset_version=11,          # the ONNX version to export the model to
+                    verbose=False,
+                    #   dynamic_axes={'input' : {0 : 'batch_size', 2: 'width', 3: 'height'}, 'output' : {0 : 'batch_size', 2: 'width', 3: 'height'}}
+                    )
 
     test = onnx.load('../models/resnet152.onnx')
     onnx.checker.check_model(test)

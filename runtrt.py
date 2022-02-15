@@ -121,7 +121,7 @@ def do_inference(context, bindings, inputs, outputs, stream, batch_size=1):
     stream.synchronize()
     t5 = time.time()
 
-    print("Transfer:{:.6f} inference:{:6f} back:{:6f} synchronize:{:6f}".format(t2 - t1, t3 - t2, t4 - t3, t5 - t4))
+    print("Transfer:{:.6f} inference:{:6f} back:{:6f} synchronize:{:6f}".format(t2 - t1, t3 - t2, t4 - t3, t5 - t3))
 
     # Return only the host outputs.
     return [out.host for out in outputs]
@@ -132,7 +132,7 @@ def postprocess_the_outputs(h_outputs, shape_of_output):
     return h_outputs
 
 # These two modes are dependent on hardwares
-fp16_mode = False
+fp16_mode = True
 int8_mode = False
 trt_engine_path = './model_fp16_{}_int8_{}.trt'.format(fp16_mode, int8_mode)
 # Build an engine
@@ -163,7 +163,7 @@ def np_trans(image):
     img_np /= std
     img_np_nchw = img_np[np.newaxis]
     img_np_nchw = np.tile(img_np_nchw,(1, 1, 1, 1))
-    img_np_nchw = img_np_nchw.astype(dtype=np.float32)
+    img_np_nchw = img_np_nchw.astype(dtype=np.float16)
     return img_np_nchw
 
 def softmax(x):
@@ -177,7 +177,7 @@ image = cv2.cvtColor(cv2.imread('2.png'), cv2.COLOR_BGR2RGB)
 inputs[0].host = np_trans(image).reshape(-1)
 
 # inputs[1].host = ... for multiple input
-for i in range(10):
+for i in range(1000):
     t1 = time.time()
     trt_outputs = do_inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
     prob = postprocess_the_outputs(trt_outputs[0], shape_of_output)

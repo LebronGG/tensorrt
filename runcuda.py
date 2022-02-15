@@ -6,6 +6,7 @@ from torchvision import transforms, models
 from PIL import Image
 import numpy as np
 import cv2
+import time
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -15,7 +16,7 @@ def softmax(x):
     return softmax_x 
 
 
-device = torch.device('cuda')
+device = torch.device('cpu')
 
 model = models.resnet152(pretrained=True)
 num_ftrs = model.fc.in_features
@@ -38,11 +39,17 @@ tfms = transforms.Compose([transforms.ToTensor(), transforms.Resize((224,224)),
 
 # image = Image.open('2.png').convert('RGB')
 image = cv2.cvtColor(cv2.imread('2.png'), cv2.COLOR_BGR2RGB)
-img = tfms(image).unsqueeze(0).to(device)
+img = tfms(image).unsqueeze(0)
 
 
 with torch.no_grad():
-    for i in range(10):
+    for i in range(1000):
         t1 = time.time()
-        prob = model(img).cpu().numpy()
-        print(time.time() - t1, softmax(prob))
+        img = img.to(device)
+        t2 = time.time()
+        prob = model(img)
+        t3 = time.time()
+        res = prob.cpu().numpy()
+        t4 = time.time()
+        print("Transfer:{:.5f} inference:{:5f} back:{:5f}".format(t2 - t1, t3 - t2, t4 - t3))
+        print(time.time() - t1, softmax(res))

@@ -60,7 +60,7 @@ def softmax(x):
 sess = rt.InferenceSession('../models/resnet152.onnx')
 
 # cpu gpu setting
-# sess.set_providers(['CPUExecutionProvider'])
+sess.set_providers(['CPUExecutionProvider'])
 
 input_name = sess.get_inputs()[0].name
 label_name = sess.get_outputs()[0].name

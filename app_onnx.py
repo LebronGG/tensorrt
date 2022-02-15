@@ -63,6 +63,8 @@ class TensorRTEngine(object):
         with trt.Builder(TRT_LOGGER) as builder, builder.create_network(EXPLICIT_BATCH) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
             builder.max_batch_size = batch_size
             builder.max_workspace_size = 1 << 30
+            #是否开启半精度 Default: False
+            builder.fp16_mode = True
             with open(onnx_file, 'rb') as model:
                 if not parser.parse(model.read()):
                     for error in range(parser.num_errors):
