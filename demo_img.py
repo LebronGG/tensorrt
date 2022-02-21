@@ -1,14 +1,16 @@
 #--*-- coding:utf-8 --*--
 import os
 
-# from pycuda.compiler import SourceModule
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+import pycuda.autoinit
 import tensorrt as trt
 import pycuda.driver as cuda
 import numpy as np
 import tensorrt as trt
 import time
 import cv2
-
+import base64
 
 def init():   # 1. 子进程开始初始化cuda driver
     cuda.init()
@@ -26,17 +28,18 @@ class HostDeviceMem(object):
     
 TRT_LOGGER = trt.Logger()
 
+def softmax(x):
+    exp_x = np.exp(x)
+    softmax_x = exp_x / np.sum(exp_x)
+    return softmax_x 
+
 class TensorRTEngine(object):
-    def __init__(self, onnx_file, batch_size=1):
-        self.cfx = cuda.Device(0).make_context()  #2. trt engine创建前首先初始化cuda上下文
-        self.engine, self.network = self.load_engine(onnx_file, batch_size)
-        self.input_shape, self.output_shape = self.infer_shape()
-        
-        # with self.engine.create_execution_context() as self.context:
-        #     ctx = cuda.Context.attach()
-        #     self.inputs, self.outputs, self.bindings, self.stream = self.allocate_buffers()
-        #     ctx.detach()
-        
+    def __init__(self, onnx_file, engine_file, batch_size=1):
+        #2. trt engine创建前首先初始化cuda上下文
+        self.cfx = cuda.Device(0).make_context()  
+        self.engine = self.load_engine(onnx_file, engine_file, batch_size)
+        # self.input_shape, self.output_shape = self.infer_shape()
+          
         self.inputs, self.outputs, self.bindings, self.stream = self.allocate_buffers()
         self.context = self.engine.create_execution_context()
         
@@ -49,22 +52,34 @@ class TensorRTEngine(object):
         del self.inputs
         del self.outputs
         del self.stream
-        self.cfx.detach() # 2. 实例释放时需要detech cuda上下文
-        
-    def load_engine(self, onnx_file, batch_size=1):
-        EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+        # 2. 实例释放时需要detech cuda上下文
+        self.cfx.detach() 
 
-        with trt.Builder(TRT_LOGGER) as builder, builder.create_network(EXPLICIT_BATCH) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
-            builder.max_batch_size = batch_size
-            builder.max_workspace_size = 1 << 30
-            with open(onnx_file, 'rb') as model:
-                if not parser.parse(model.read()):
-                    for error in range(parser.num_errors):
-                        print(parser.get_error(error))
-            engine = builder.build_cuda_engine(network)
-        print("Load onnx sucessful!")
+    def load_engine(self, onnx_file, engine_file, batch_size=1):
+
+        def build_engine(batch_size, save_engine):
+            EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+            with trt.Builder(TRT_LOGGER) as builder, builder.create_network(EXPLICIT_BATCH) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
+                builder.max_batch_size = batch_size
+                builder.max_workspace_size = 1 << 30
+                builder.fp16_mode = True
+                with open(onnx_file, 'rb') as model:
+                    if not parser.parse(model.read()):
+                        for error in range(parser.num_errors):
+                            print(parser.get_error(error))
+                engine = builder.build_cuda_engine(network)
+            print("Load onnx sucessful!")
+            if save_engine:
+                with open(engine_file, "wb") as f:
+                    f.write(engine.serialize())
+            return engine
         
-        return engine, network
+        if os.path.exists(engine_file):
+            print("Reading engine from file {}".format(engine_file))
+            with open(engine_file, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
+                return runtime.deserialize_cuda_engine(f.read())
+        else:
+            return build_engine(batch_size, True)
 
     def infer_shape(self):
         for binding in self.engine:
@@ -128,14 +143,15 @@ class TensorRTEngine(object):
         image = cv2.imread(filename)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         self.inputs[0].host = self.preprocess(image)
-        self.cfx.push()  # 3. 推理前执行cfx.push()
+        # self.cfx.push()  # 3. 推理前执行cfx.push()
         trt_outputs = self.do_inference(self.context, bindings=self.bindings, 
                                             inputs=self.inputs, 
                                             outputs=self.outputs, 
                                             stream=self.stream)
+        
         output = self.postprocess(trt_outputs[0])
-        self.cfx.pop()  # 3. 推理后执行cfx.pop()
-        return output
+        # self.cfx.pop()  # 3. 推理后执行cfx.pop()
+        return softmax(output)
     
     def inference_image(self, image):
         self.inputs[0].host = self.preprocess(image)
@@ -147,13 +163,21 @@ class TensorRTEngine(object):
         
         output = self.postprocess(trt_outputs[0])
         self.cfx.pop()  # 3. 推理后执行cfx.pop()
-        return output
+        return softmax(output)
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-    import pycuda.autoinit
-    model = TensorRTEngine('../models/drop.onnx')
+    model = TensorRTEngine('../models/drop.onnx', '../models/drop_fp16.trt')
     image = cv2.imread('1.png')
+    
+    
+    if True:
+        image = cv2.imencode('.png', image)[1]
+        imgencode = base64.b64encode(image).decode('utf8')
+
+        imgdecode = base64.b64decode(imgencode.encode('utf8'))
+        image = np.fromstring(imgdecode, np.uint8)
+        image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     for i in range(10):
         t1 = time.time()

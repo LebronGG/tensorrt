@@ -13,12 +13,8 @@ from PIL import Image
 import cv2
 from torchvision import transforms
 
-max_batch_size = 1
-onnx_model_path = "../models/resnet152.onnx"
-
 
 TRT_LOGGER = trt.Logger()  # This logger is required to build an engine
-
 
 class HostDeviceMem(object):
     def __init__(self, host_mem, device_mem):
@@ -131,22 +127,6 @@ def postprocess_the_outputs(h_outputs, shape_of_output):
     h_outputs = h_outputs.reshape(*shape_of_output)
     return h_outputs
 
-# These two modes are dependent on hardwares
-fp16_mode = True
-int8_mode = False
-trt_engine_path = './model_fp16_{}_int8_{}.trt'.format(fp16_mode, int8_mode)
-# Build an engine
-engine = get_engine(max_batch_size, onnx_model_path, trt_engine_path, fp16_mode, int8_mode)
-# Create the context for this engine
-context = engine.create_execution_context()
-# Allocate buffers for input and output
-inputs, outputs, bindings, stream = allocate_buffers(engine) # input, output: host # bindings
-
-# Do inference
-shape_of_output = (max_batch_size, 2)
-# Load data to the buffer
-
-
 def torch_trans(image):
     tfms = transforms.Compose([ transforms.ToTensor(), transforms.Resize((224,224)),
                             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
@@ -163,7 +143,7 @@ def np_trans(image):
     img_np /= std
     img_np_nchw = img_np[np.newaxis]
     img_np_nchw = np.tile(img_np_nchw,(1, 1, 1, 1))
-    img_np_nchw = img_np_nchw.astype(dtype=np.float16)
+    img_np_nchw = img_np_nchw.astype(dtype=np.float32)
     return img_np_nchw
 
 def softmax(x):
@@ -171,16 +151,28 @@ def softmax(x):
     softmax_x = exp_x / np.sum(exp_x)
     return softmax_x 
 
-# image = Image.open('2.png').convert('RGB')
-image = cv2.cvtColor(cv2.imread('2.png'), cv2.COLOR_BGR2RGB)
+
+max_batch_size = 1
+shape_of_output = (max_batch_size, 2)
+
+onnx_model_path = "../models/drop.onnx"
+trt_engine_path = "../models/drop_fp16.trt"
+
+engine = get_engine(max_batch_size, onnx_model_path, trt_engine_path, fp16_mode=True, int8_mode=False)
+# Create the context for this engine
+context = engine.create_execution_context()
+# Allocate buffers for input and output
+inputs, outputs, bindings, stream = allocate_buffers(engine) # input, output: host # bindings
+
+image = cv2.cvtColor(cv2.imread('1.png'), cv2.COLOR_BGR2RGB)
 
 inputs[0].host = np_trans(image).reshape(-1)
 
 # inputs[1].host = ... for multiple input
-for i in range(1000):
+for i in range(10):
     t1 = time.time()
     trt_outputs = do_inference(context, bindings=bindings, inputs=inputs, outputs=outputs, stream=stream)
     prob = postprocess_the_outputs(trt_outputs[0], shape_of_output)
-    print(time.time() - t1, softmax(prob))
+    print(round(time.time() - t1, 6), softmax(prob))
 
 

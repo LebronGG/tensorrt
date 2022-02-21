@@ -11,9 +11,8 @@ import concurrent.futures
 sess = requests.Session()
 
 file = '1.png'
-onnx = 'http://127.0.0.1:5051/getImg'
-cuda = 'http://127.0.0.1:5052/getImg'
-# gpu = 'http://thservinggpu.cc.163.com/predictions/porndet'
+onnx = 'http://127.0.0.1:5000/predict'
+cuda = 'http://127.0.0.1:5001/predict'
 gpu = 'http://10.170.100.12:19180/predictions/porndet'
 cpu = 'http://thserving.cc.163.com:18080/predictions/porndet'
 # cpu = 'http://thserving-ol.cc.163.com:18080/predictions/pornmodel'
@@ -36,29 +35,24 @@ def test_cpu(data):
 
 
 if __name__ == '__main__':
-    p = concurrent.futures.ThreadPoolExecutor(max_workers=4) # ProcessPoolExecutor ThreadPoolExecutor
+    p = concurrent.futures.ThreadPoolExecutor(max_workers=8) # ProcessPoolExecutor ThreadPoolExecutor
     image = cv2.imread(file)
-    # image = cv2.resize(image, (224, 224))
+    image = cv2.resize(image, (224, 224))
     image = cv2.imencode('.png', image)[1]
     img_b64encode = base64.b64encode(image).decode('utf8')
 
-    data = {"image": img_b64encode}
-    jdata = {"data": img_b64encode}
+    data = {"data": img_b64encode}
 
-
-    t1 = time.time()
-
-    # files = [data for i in range(100)]
-    # res = list(p.map(test_onnx, files))
-
-    for i in range(10):
-        t2 = time.time()
-        res = test_cpu(jdata)
-        print(time.time() - t2, res)
-
-    # files = [jdata for i in range(100)]
-    # res = list(p.map(test_cpu, files))
-
+    files = [data for i in range(1000)]
     
-    # print(res)
+    t1 = time.time()
+    
+    res = list(p.map(test_cpu, files))
+    
+    # for file in files:
+    #     t2 = time.time()
+    #     res = test_cpu(file)
+    #     print(time.time() - t2, res)
+
     print(time.time() - t1)
+    

@@ -32,7 +32,7 @@ def opencv2_onnx_defect_infer():
     onnx_name = "../models/drop.onnx"
     net = cv2.dnn.readNetFromONNX(onnx_name)
 
-    image = cv2.cvtColor(cv2.imread('2.png'), cv2.COLOR_BGR2RGB)
+    image = cv2.cvtColor(cv2.imread('1.png'), cv2.COLOR_BGR2RGB)
     blob = BlobFromNormalizeRGBImage(image, meanList=[0.485, 0.456, 0.406],stdList=[0.229, 0.224, 0.225])
     
     net.setInput(blob)

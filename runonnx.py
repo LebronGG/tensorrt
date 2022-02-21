@@ -57,7 +57,7 @@ def softmax(x):
     softmax_x = exp_x / np.sum(exp_x)
     return softmax_x 
 
-sess = rt.InferenceSession('../models/resnet152.onnx')
+sess = rt.InferenceSession('../models/drop.onnx')
 
 # cpu gpu setting
 sess.set_providers(['CPUExecutionProvider'])
@@ -66,13 +66,11 @@ input_name = sess.get_inputs()[0].name
 label_name = sess.get_outputs()[0].name
 
 
-# image = Image.open('2.png').convert('RGB')
-image = cv2.cvtColor(cv2.imread('2.png'), cv2.COLOR_BGR2RGB)
+image = cv2.cvtColor(cv2.imread('1.png'), cv2.COLOR_BGR2RGB)
 
-# img = np_trans(image)
+img = np_trans(image)
 
 for i in range(10):
     t1 = time.time()
-    img = np_trans(image)
     prob = sess.run([label_name], {input_name:img})[0]
     print(time.time() - t1, softmax(prob))
